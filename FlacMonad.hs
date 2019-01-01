@@ -4,7 +4,7 @@ import Control.Monad.IO.Class
 import DflateTerm
 
 class (Monad m, MonadIO m) => DFlacMonad m where
---  getDelContext :: m DelContext
+  getDelContext :: m DelContext
   (≽) :: Principal -> Principal -> m Bool
   (≤) :: Label -> Type -> m Bool
   (⊑) :: Principal -> Principal -> m Bool

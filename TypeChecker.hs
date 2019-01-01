@@ -7,20 +7,24 @@ import Data.Map as M
 import Data.Set as S
 import DflateTerm
 import FlacMonad
-
+import Norm
 
 
 newtype DflateM a = DflateM { unDflateM :: StateT DelContext IO a  }
   deriving (Functor, Applicative, Monad, MonadState DelContext, MonadIO)
 
 instance DFlacMonad DflateM where
---  getDelContext = get
+  getDelContext = get
   -- Π, ⊥, ⊤  ⊩ p₁ ≽ p₂
-  (≽) p1 p2 = return True
+  (≽) p1 p2 = do
+    del <- getDelContext
+    return (proofsearch del p1 p2)  -- offload to norm module
   -- Π, ⊥, ⊤  ⊩ ℓ ≤ τ
   (≤) l ty  = return True
   -- Π, ⊥, ⊤  ⊩ p₁ ⊑ p₂
-  (⊑) p1 p2 = return  True
+  (⊑) p1 p2 = do
+    status <- (((:←) p1) :∧ ((:→) p2)) ≽ (((:←) p2) :∧ ((:→) p1))
+    return status
   -- Π, ⊥, ⊤  ⊩ p₁ ⊔ p₂
   (⊔) p1 p2 = return (Prim T)
   -- Π, ⊥, ⊤  ⊩ p₁ ⊓ p₂
