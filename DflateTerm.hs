@@ -98,13 +98,16 @@ data Type = Dot DotType | Halt DotType
 type TypeEnv = M.Map String Type
 
  
-data Channel =
+data ChannelTy =
   SendCh Principal Principal PC DotType
   | RecvCh Principal Principal PC DotType
   deriving (Eq, Show)
 
-type Theta = M.Map String Channel 
-  
+type Theta = M.Map String ChannelTy
+
+-- Channel variables
+type Channel = String
+
 data Term =
   Var String
   | Unit
@@ -119,9 +122,10 @@ data Term =
   | Bind String Term Term
   | Protect Label Term
   | Assume Term Term
+  | Term :@ Term -- Where Term
   | Send String Term Term
   | Receive String String Term
   | TEE Principal Term -- ensure no recursive TEE
   | RunTEE String Term
-  | Term :@ Term
+  | Spawn Place Place Channel PC  DotType Channel PC DotType Term Term
   deriving (Eq, Show)

@@ -89,11 +89,21 @@ typecheck  g theta p pc e = case e of
      case (cl, status1, status2) of
        (True, True, True) -> return ty
        (_, _, _) -> fail $ " Assume failed to typecheck (clearance, voice of pc, voice of principals) : " ++ (show cl) ++ " " ++ (show status1) ++ " " ++ (show status2)
+   t :@ v -> return (Dot UnitTy)
    Send c t1 t2 -> return (Dot UnitTy)
    Receive c x t -> return (Dot UnitTy)
    TEE p t  -> return (Dot UnitTy)
    RunTEE t t' -> return (Dot UnitTy)
-   t :@ v -> return (Dot UnitTy)
+   Spawn p' q chr pcr  tyr chs pcs tys t1 t2 -> do
+     let pc' = pc
+     ty' <- typecheck M.empty (M.insert chr (RecvCh p' p pcr tyr) $ M.insert chs (SendCh p p' pcs tys) M.empty) q pc' t1
+     ty <- typecheck M.empty (M.insert chs (SendCh p p' pcs tys) $ M.insert chr (RecvCh p' p pcr tyr) M.empty) p pc t2
+     cl <- clearance p pc
+     status1 <- pc ⊑ pc'
+     status2 <- pc' ≤ ty'
+     case (cl, status1, status2, (p == q) || (p' == q)) of
+       (True, True, True, True) -> return ty
+       (s1, s2, s3, s4) -> fail $ "Spawn failed to type check (clearance, pc ⊑ pc', pc' ≤ τ', p ≠ q ⇒ p' = q) :" ++ (show cl) ++ " " ++ (show status1) ++ " " ++ (show status2) ++ " " ++ (show s4)
 
 
 testtc :: DflateM Type
