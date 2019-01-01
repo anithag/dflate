@@ -1,1 +1,1 @@
-Implementation of Ditributed FLAC.
+Implementation of Distributed FLAC using naive proof search.
