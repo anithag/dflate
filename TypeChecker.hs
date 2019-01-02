@@ -37,7 +37,11 @@ instance DFlacMonad DflateM where
   voice p = let ((:→) pc) :∧  ((:←) pi) = factorize p in
     return $ ((:←) pc) :∧ ((:←) pi)
   
-
+channellookup :: (DFlacMonad m) => Theta -> Channel -> m ChannelTy
+channellookup theta ch = case (M.lookup ch theta) of
+  Just ty -> return ty
+  Nothing -> fail $ "Channel " ++ ch ++ " not found"
+  
 typecheck :: (DFlacMonad m) => TypeEnv -> Theta -> Place -> PC ->Term -> m Type
 typecheck  g theta p pc e = case e of
    Var s -> fail "lookup failed"  
@@ -90,8 +94,38 @@ typecheck  g theta p pc e = case e of
        (True, True, True) -> return ty
        (_, _, _) -> fail $ " Assume failed to typecheck (clearance, voice of pc, voice of principals) : " ++ (show cl) ++ " " ++ (show status1) ++ " " ++ (show status2)
    t :@ v -> return (Dot UnitTy)
-   Send c t1 t2 -> return (Dot UnitTy)
-   Receive c x t -> return (Dot UnitTy)
+   Send ch t1 t2 -> do
+     (Dot ty) <- typecheck g M.empty p pc t1
+     (SendCh p' q pcs tyc) <- channellookup theta ch
+     cl <- clearance p pc
+     let pc' = pc
+     ty' <- typecheck g theta p pc t2
+     status1 <- pc ⊑ pcs
+     status2 <- pcs ⊑ pc'
+     status3 <- pc' ≤ ty'
+     status4 <- p ≽ pcs
+     case (cl, status1, status2, status3, status4, (p == p') && (ty == tyc)) of
+       (True, True, True, True, True, True) -> case ty' of
+         Dot dty' -> return $ Halt dty'
+         Halt dty' -> return $ Halt dty'
+       (s1, s2, s3, s4, s5, s6) -> fail $ "Send failed to typecheck (clearance, pc ⊑ pc_ch, pc_ch ⊑ pc', pc' ≤ τ', p ≽ pc_ch, channel place and type) :" ++ (show s1) ++ " " ++ (show s1) ++ " "++ (show s2) ++ " "++ (show s3) ++ " "++ (show s4) ++ " "++ (show s5) ++ " "++ (show s6)
+       
+   Receive ch x t -> do
+--     (Dot ty) <- typecheck g M.empty p pc t1
+     (RecvCh p' q pcr tyc) <- channellookup theta ch
+     cl <- clearance p pc
+     let pc' = pc
+     ty' <- typecheck (M.insert x (Dot tyc) g) theta p pc t
+     status1 <- pc ⊑ pcr
+     status2 <- pcr ⊑ pc'
+     status3 <- pc' ≤ ty'
+     status4 <- p ≽ pcr
+     case (cl, status1, status2, status3, status4, (p == p')) of
+       (True, True, True, True, True, True) -> case ty' of
+         Dot dty' -> return $ Halt dty'
+         Halt dty' -> return $ Halt dty'
+       (s1, s2, s3, s4, s5, s6) -> fail $ "Receive failed to typecheck (clearance, pc ⊑ pc_ch, pc_ch ⊑ pc', pc' ≤ τ', p ≽ pc_ch, channel place) :" ++ (show s1) ++ " " ++ (show s1) ++ " "++ (show s2) ++ " "++ (show s3) ++ " "++ (show s4) ++ " "++ (show s5) ++ " "++ (show s6)
+       
    TEE p t  -> return (Dot UnitTy)
    RunTEE t t' -> return (Dot UnitTy)
    Spawn p' q chr pcr  tyr chs pcs tys t1 t2 -> do
