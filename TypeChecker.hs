@@ -21,7 +21,22 @@ instance DFlacMonad DflateM where
     del <- getDelContext
     return (proofsearch del p1 p2)  -- offload proof search to norm module
   -- Π, ⊥, ⊤  ⊩ ℓ ≤ τ
-  (≤) l ty  = return True
+  (≤) l ty  = do
+    del <- getDelContext
+    case ty of
+      (Dot UnitTy) -> return True
+      (Dot (p :> q)) -> return True
+      (Dot  (ProdTy ty₁ ty₂)) -> do
+        st₁ <- l ≤ (Dot ty₁)
+        st₂ <- l ≤ (Dot ty₂)
+        return $ st₁ && st₂
+      (Dot  (SaysTy l' ty)) -> do
+        st₁ <- l ≤ (Dot ty)
+        st₂ <- l ⊑ l'
+        return $ st₁ || st₂
+      (Halt ty) -> l ≤ (Dot ty)
+      _ -> return  False
+      
   -- Π, ⊥, ⊤  ⊩ p₁ ⊑ p₂
   (⊑) p1 p2 = do
     status <- (((:←) p1) :∧ ((:→) p2)) ≽ (((:←) p2) :∧ ((:→) p1))
@@ -32,7 +47,6 @@ instance DFlacMonad DflateM where
   (⊓) p q = return $ ((:→) (p :∨ q)) :∧ ((:←) (p :∧ q))
   -- clearance
   clearance p pc = p ≽ pc
-  getState = get
   -- compute voice
   voice p = let ((:→) pc) :∧  ((:←) pi) = factorize p in
     return $ ((:←) pc) :∧ ((:←) pi)

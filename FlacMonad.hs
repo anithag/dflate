@@ -13,7 +13,7 @@ class (Monad m, MonadIO m) => DFlacMonad m where
   (⊔) :: Principal -> Principal -> m Principal
   (⊓) :: Principal -> Principal -> m Principal
   clearance :: Place -> Principal -> m Bool
-  getState :: m DelContext
+--  getState :: m DelContext
   voice :: Principal -> m Principal
 
 
