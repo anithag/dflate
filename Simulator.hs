@@ -76,6 +76,14 @@ eval cfg = case (term cfg) of
       Just t -> return $ cfg { term = t }
   I n -> return cfg
   Abs x ty pc' theta'  t -> return cfg
+  Actsfor p q -> return cfg
+  InjL t ty -> do
+    cfg' <- eval cfg{term = t}
+    return cfg{term = InjL (term cfg') ty }
+  InjR t ty -> do
+    cfg' <- eval cfg{term = t}
+    return cfg{term = InjR (term cfg') ty } 
+  t1 :@ t2 -> return cfg   -- where term
   App t1 t2 -> do
     lamcfg <- eval cfg{term = t1}
     argcfg <- eval cfg{term = t2}
@@ -84,6 +92,39 @@ eval cfg = case (term cfg) of
         let e' = env lamcfg
         let v = term argcfg
         return lamcfg{term = t, env = M.insert x v e'}
+  Case t1 x t2 y t3 -> do
+    ccfg <- eval cfg{term = t1}
+    let e' = env cfg
+    case (term ccfg) of
+      InjL  v _ -> eval cfg{term = t2, env = M.insert x v e'}
+      InjR  v _ -> eval cfg{term = t3, env = M.insert y v e'}
+  Pair t1 t2 -> do
+    cfg1 <- eval cfg{term = t1}
+    cfg2 <- eval cfg{term = t2}
+    return cfg{term = Pair (term cfg1) (term cfg2)}
+  Fst t -> do
+    cfg' <- eval cfg{term = t}
+    case (term cfg') of
+      Pair v1 v2 -> return cfg{term =v1}
+      _ -> fail $ "Expected a pair value, but received none"
+  Snd t -> do
+    cfg' <- eval cfg{term = t}
+    case (term cfg') of
+      Pair v1 v2 -> return cfg{term =v2}
+      _ -> fail $ "Expected a pair value, but received none"
+  Bind x t1 t2  -> do
+    cfg1 <- eval cfg{term = t1}
+    let e' = env cfg
+    case (term cfg1) of
+      Protect l t -> return cfg{term = t2, env = M.insert x t e'}
+      _ -> fail $ "Expected a protected value, received none"
+  Protect l t  -> do
+     cfg' <- eval cfg{term = t}
+     return cfg{term = Protect l (term cfg')}
+  Assume t1 t2 -> do
+    cfg1 <- eval cfg{term = t1}
+    let v = term cfg1  -- can be acts-for or where term
+    return cfg{term = t2 :@ v}
   Spawn p' q chr pcr  tyr chs pcs tys t1 t2 ->
     let chr' = newChan in
       do

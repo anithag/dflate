@@ -34,7 +34,7 @@ gterm =
   <|> try (assume <|> tee)
   <|> try unit
   <|> try (first <|> second <|> pair)
-  <|> (try true <|> try false <?> "boolean literal")
+  <|> (try injl <|> try injr <?> "boolean literal")
   <|> intLiteral
   <|> lam <|> parens term
   <|> try ite
@@ -63,15 +63,38 @@ unit :: CParser Term
 unit = symbol "()" >> return Unit
 
 
-true :: CParser Term
-true = symbol "true" >> return DTrue
+injl :: CParser Term
+injl =  do reserved  "injl"
+           e <- term
+           reserved "as"
+           ty <- sumty
+           return (InjL e ty)
 
-false :: CParser Term
-false = symbol "false" >> return DFalse
 
+injr :: CParser Term
+injr =  do reserved  "injr"
+           e <- term
+           reserved "as"
+           ty <- sumty
+           return (InjR e ty)
+
+cond :: CParser Term
+cond = injl <|> injr
+
+
+ite :: CParser Term
+ite = do reserved "case"
+         c <- cond <?> "branch condition"
+         reserved "inj1"
+         x <- identifier
+         e1 <- gterm
+         reserved "inj2"
+         y <- identifier
+         e2 <- gterm
+         return (Case c x e1 y e2)
 
 intLiteral :: CParser Term
-intLiteral = N <$> integer
+intLiteral = I <$> integer
 
 
 
@@ -91,15 +114,6 @@ recv = do reserved "receive"
           e <- term
           return (Receive ch x e) 
 
-ite :: CParser Term
-ite = do reserved "if"
-         c <- gterm <?> "branch condition"
-         reserved "then"
-         e1 <- gterm
-         reserved "else"
-         e2 <- gterm
-         return (Case c e1 e2)
-
 term :: CParser Term
 term =  (chainl1 gterm (return App))
        
@@ -110,7 +124,22 @@ dtype =
   <|> funty
   <|> saysty <|>  dtype
 
+ndtype :: CParser Type
+ndtype =
+  try (ddtype  <|> htype)
 
+
+ddtype :: CParser Type
+ddtype = do
+  ty <- dtype
+  return (Dot ty)
+  
+htype :: CParser Type
+htype = do
+  ty <- dtype
+  symbol "#"
+  return (Halt ty)
+  
 unitty :: CParser DotType
 unitty = do
   symbol "()"
@@ -126,7 +155,7 @@ actsty = do
   symbol ">"
   p1 <- principal
   p2 <- principal
-  return (ActsTy p1 p2)
+  return (p1 :> p2)
 
 sumty :: CParser DotType
 sumty = do
@@ -151,7 +180,7 @@ funty = do
   symbol ","
   theta <- principal
   symbol "]"
-  ty2 <- dtype
+  ty2 <- ndtype
   return (FunTy ty1 pc  M.empty ty2)
 
 saysty :: CParser DotType
@@ -173,7 +202,7 @@ lam = do symbol "\\"
          symbol "]"
          symbol "."
          t <- term
-         return (Abs x t)
+         return (Abs x ty pc M.empty t)
 
 bind :: CParser Term
 bind = do reserved "bind"
@@ -186,7 +215,7 @@ bind = do reserved "bind"
 
 dflatelabel :: CParser Label
 dflatelabel  = do l <- identifier
-                  return  (Prim l)
+                  return  (Prim (N l))
             
 protect :: CParser Term
 protect = do reserved "eta"
@@ -196,32 +225,32 @@ protect = do reserved "eta"
 
 principal :: CParser Principal
 principal =
-   try (top <|> bottom)
-  <|> confid <|> integrity
+  confid <|> integrity
   <|>  conjunction <|> disjunction
   <|> parens principal
---  <|> primitive
+  <|> top <|> bottom
+  <|> primitive
 --  <|> computation
-  <|> (Prim <$> identifier)
+--  <|> (Prim  ltype)
 
-
+   
 primitive :: CParser Principal
 primitive = do l <- identifier
-               return (Prim l)
+               return (Prim (N l))
 
 top, bottom :: CParser Principal
-top = symbol "top" >> return Top
+top = symbol "top" >> return (Prim T)
 
-bottom = symbol "bot" >> return Bot
+bottom = symbol "bot" >> return (Prim B)
 
 confid, integrity :: CParser Principal
 confid = do reserved "secret"
             p <- principal
-            return (Confid p)
+            return ((:→) p)
             
 integrity = do reserved "integrity"
                p <- principal
-               return (Integrity p)
+               return ((:←) p)
 
 conjunction, disjunction :: CParser Principal
 conjunction = do
@@ -236,10 +265,12 @@ disjunction = do
   p2 <- principal
   return (p1 :∨ p2)
 
+{-
 computation :: CParser Principal
 computation = do
   l <- identifier
   return (T l)
+ -}
   
 tee :: CParser Term
 tee = do reserved "tee"

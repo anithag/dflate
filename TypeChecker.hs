@@ -62,6 +62,18 @@ typecheck  g theta p pc e = case e of
    Unit  -> return (Dot UnitTy)
    I n -> return (Dot IntTy)
    Actsfor p1 p2 -> return (Dot $ p1 :>  p2)
+   InjL t (SumTy ty1 ty2) -> do
+                    (Dot ty) <- typecheck g theta p pc t
+                    cl <- clearance p pc
+                    case (cl, ty == ty1) of
+                      (True, True) -> return (Dot $ SumTy ty1 ty2 )
+                      (_, _ ) -> fail $ "InjL failed to type check"
+   InjR t (SumTy ty1 ty2)  -> do
+                    (Dot ty) <- typecheck g theta p pc t
+                    cl <- clearance p pc
+                    case (cl,  ty == ty2) of
+                      (True, True) -> return (Dot $ SumTy ty1 ty2)
+                      (_, _ ) -> fail $ "InjR failed to type check"
    Abs x ty pc' theta'  t -> do
      rt <- typecheck (M.insert x (Dot ty) g) theta' p pc' t
      cl <- clearance p  pc
@@ -70,16 +82,43 @@ typecheck  g theta p pc e = case e of
        False -> fail "Clearance failed for Abstraction"
    App t1 t2 -> do
      Dot (FunTy argty pc' theta' rt) <- typecheck g theta p pc t1
-     Dot argty' <- typecheck g theta p pc' t2
+     Dot argty' <- typecheck g theta p pc t2
      cl <- clearance p  pc
      flows <- pc ⊑ pc'
      case (argty == argty', cl, flows) of
        (True, True, True) -> return rt
        (_, _,_)  -> fail "App failed to type check"
-   Case t1 t2 t3 -> return (Dot UnitTy)
-   Pair t1 t2 -> return (Dot UnitTy)
-   Fst t -> return (Dot UnitTy)
-   Snd t -> return (Dot UnitTy)
+   Case t1 x t2 y t3 -> do
+     Dot (SumTy ty1 ty2) <- typecheck g theta p pc t1
+     tyl <- typecheck (M.insert x (Dot ty1) g) theta p pc t2
+     tyr <- typecheck (M.insert y (Dot ty2) g) theta p pc t3
+     cl <- clearance p pc
+     case (cl, tyl == tyr) of
+       (True, True) -> do
+         status <- pc ≤ tyl
+         case status of
+           True -> return tyl
+           False -> fail $ "Case failed to type check due to insufficient pc protection"
+       (_, _) -> fail $ "Case failed to type check. Different types for branches"
+   Pair t1 t2 -> do
+     (Dot ty1) <- typecheck g theta p pc t1
+     (Dot ty2) <- typecheck g theta p pc t2
+     cl <- clearance p pc
+     case cl of
+       True ->      return $ Dot (ProdTy ty1 ty2)
+       False -> fail $ "Pair failed to type check"
+   Fst t -> do
+     Dot (ProdTy ty1 ty2) <-  typecheck g theta p pc t
+     cl <- clearance p pc
+     case cl of
+       True -> return $ Dot ty1
+       False -> fail $ "Fst failed to type check"
+   Snd t -> do
+     Dot (ProdTy ty1 ty2) <-  typecheck g theta p pc t
+     cl <- clearance p pc
+     case cl of
+       True -> return $ Dot ty2
+       False -> fail $ "Snd failed to type check"
    Bind x t1 t2  -> do
      Dot (SaysTy l ty) <- typecheck g theta p pc t1
      j <- (pc ⊔ l)

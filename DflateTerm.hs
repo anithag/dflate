@@ -83,11 +83,12 @@ data DotType =
   | SaysTy Label DotType
   deriving Eq
 
+
 instance Show DotType where
   show  (p1 :> p2) = (show p1) ++ " ≽ "  ++ (show p2)
   show UnitTy = "()"
   show IntTy = " int "
-  show (SumTy ty1 ty2) = (show ty1) ++ "+" ++  (show ty2)
+  show (SumTy ty2 ty1) = (show ty1) ++ " + "  ++  (show ty1)
   show (ProdTy ty1 ty2) =  (show ty1) ++ "x" ++  (show ty2)
   show (FunTy ty1 pc theta ty2 ) = (show ty1)  ++ "[" ++  (show pc) ++ ", " ++ (show (Prim B)) ++ "]" ++ (show ty2)
   show (SaysTy l ty) = (show l) ++ (show ty) 
@@ -112,10 +113,12 @@ data Term =
   Var String
   | Unit
   | I Integer
+  | InjL Term DotType   -- inl t as τ₁ + τ₂
+  | InjR Term DotType   -- inr t as τ₁ + τ₂
   | Actsfor Principal Principal
   | Abs String DotType Principal Theta Term
   | App Term Term
-  | Case Term Term Term
+  | Case Term String Term String Term -- case injᵢ v of inj₁(x). e₁ | inj₂(x). e₂
   | Pair Term Term
   | Fst Term
   | Snd Term
