@@ -1,6 +1,6 @@
 Implementation of Distributed FLAC using naive proof search.
 
-##Prerequisites
+## Prerequisites
 
 
 * Cloud Haskell : distributed-process, network-transpor-tcp
@@ -19,7 +19,7 @@ Implementation of Distributed FLAC using naive proof search.
 
 A TEE is implemented as a light-weight linux container. Following steps are used to create container:
 
-1. lxc-create -t download -n _tee name_
-2. lxc-start -n _tee name_
-3. lxc-attach -n _tee name_ _bash script_
-   * _bash script_ downloads cabal, ghc and cloud haskell
+1. lxc-create -t download -n _<tee name>_
+2. lxc-start -n _<tee name>_
+3. lxc-attach -n _<tee name>_ _<bash script>_
+   * _<bash script>_ downloads cabal, ghc and cloud haskell
