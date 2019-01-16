@@ -1,5 +1,11 @@
 {-# LANGUAGE PostfixOperators #-}
+{-# LANGUAGE TemplateHaskell, DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module DflateTerm where
+
+import Data.Binary
+import Data.Typeable
+import GHC.Generics (Generic)
 
 import Data.Map as M
 import Data.Set as S
@@ -10,7 +16,7 @@ data L =
    N String   -- primitive strings
   |T   -- Top
   |B   -- Bot
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, Typeable)
 
 instance Show L where
   show (N s) = s
@@ -24,7 +30,7 @@ data Principal =
   | !Principal :∧ !Principal
   | !Principal :∨ !Principal
 --  | T String  --computation principals
-  deriving (Ord)
+  deriving (Ord, Generic, Typeable)
 
 instance Eq Principal where
   (Prim (N s1)) == (Prim (N s2)) = s1 == s2
@@ -81,7 +87,7 @@ data DotType =
   | ProdTy DotType DotType
   | FunTy DotType PC Theta Type
   | SaysTy Label DotType
-  deriving Eq
+  deriving (Eq, Generic, Typeable)
 
 
 instance Show DotType where
@@ -94,7 +100,7 @@ instance Show DotType where
   show (SaysTy l ty) = (show l) ++ (show ty) 
   
 data Type = Dot DotType | Halt DotType
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Generic)
 
 type TypeEnv = M.Map String Type
 
@@ -102,7 +108,7 @@ type TypeEnv = M.Map String Type
 data ChannelTy =
   SendCh Principal Principal PC DotType
   | RecvCh Principal Principal PC DotType
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Typeable)
 
 type Theta = M.Map String ChannelTy
 
@@ -131,4 +137,12 @@ data Term =
   | TEE Principal Term -- ensure no recursive TEE
   | RunTEE String Term
   | Spawn Place Place Channel PC  DotType Channel PC DotType Term Term
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Generic)
+
+instance Binary L
+instance Binary Principal
+instance Binary ChannelTy
+instance Binary DotType
+instance Binary Term
+instance Binary Type
+

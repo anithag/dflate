@@ -1,14 +1,30 @@
 {-# language GeneralizedNewtypeDeriving, FlexibleContexts #-}
 {-# language DeriveFunctor #-}
+{-# LANGUAGE TemplateHaskell, DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Simulator where
 
-import DflateTerm
+import DflateTerm hiding (get)
 import Control.Concurrent
 import Data.Map as M
 import Data.List as L
 import Control.Monad.Trans
 import Control.Monad.State.Lazy
 import Control.Concurrent.Chan
+
+
+-- imports for spawning a process on remote node
+import Control.Monad (forever)
+import qualified Control.Distributed.Process as DP
+import Control.Distributed.Process.Closure
+import Control.Distributed.Process.Node
+import Network.Transport (EndPointAddress(..))
+import Network.Transport.TCP (createTransport, defaultTCPParameters)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
+import System.Environment (getArgs)
+import Foreign.StablePtr
+
 
 class (Monad m, MonadIO m) => SimulatorM m where
   getDelContext :: m DelContext
@@ -156,6 +172,6 @@ eval cfg = case (term cfg) of
     v <- liftIO $ readChan ch'
     -- continue with continuation
     return cfg{term = t, env = M.insert x v e'}
-                       
-  _ -> fail $ "Case not handled"
+  TEE p t -> fail  "Support in progress"
+  _ -> fail  "Case not handled"
   
