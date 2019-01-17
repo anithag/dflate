@@ -134,8 +134,8 @@ data Term =
   | Term :@ Term -- Where Term
   | Send String Term Term
   | Receive String String Term
-  | TEE Principal Term -- ensure no recursive TEE
-  | RunTEE String Term
+  | TEE Place Term -- ensure no recursive TEE
+  | RunTEE Place Term
   | Spawn Place Place Channel PC  DotType Channel PC DotType Term Term
   deriving (Eq, Show, Typeable, Generic)
 
