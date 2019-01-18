@@ -3,15 +3,21 @@ Implementation of Distributed FLAC using naive proof search.
 ## Prerequisites
 
 
-* Cloud Haskell : distributed-process, network-transpor-tcp
+* Cloud Haskell : distributed-process, network-transpor-tcp, bindings-lxc
 * Ubuntu
 
+
+## Issues
+
+1. TEE is implemented as a light-weight linux container. At the moment the container creation is hard-coded for testing.
+2. Typed channels are used. However, _ReceivePort_ can not be serialized. So a TEE process has to create a _ReceivePort_ and send it to parent process for
+communication.
+3. There are issues with sending and receiving ports using _send_ and _expect_
 
 ## TODO
 
 
-1. Support for TEE's
-2. Case Studies
+ Case Studies
 
 
 ## Design Notes for TEE's

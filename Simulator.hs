@@ -9,7 +9,11 @@ import Data.Map as M
 import Data.List as L
 import Control.Monad.Trans
 import Control.Monad.State.Lazy
+import qualified Data.Binary as B
+import Data.Typeable
+import GHC.Generics (Generic)
 
+import qualified Control.Concurrent as C
 
 -- imports for spawning a process on remote node
 import Control.Monad (forever)
@@ -23,13 +27,14 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import System.Environment (getArgs)
 import Foreign.StablePtr
-
+import System.LXC
 
 class (Monad m, MonadIO m) => SimulatorM m where
   getDelContext :: m DelContext
   putDelContext :: DelContext -> m ()
   freshName :: m String
   liftProcess :: Process a -> m a
+  getPid :: m ProcessId
 
 -- Monad to generate fresh names  
 newtype FreshT m b =
@@ -68,13 +73,16 @@ instance SimulatorM DflateSim where
   putDelContext = put
   freshName = DflateSim (lift fresh)
   liftProcess p = DflateSim (lift  (lift  p))
+  getPid = liftProcess $ getSelfPid
 
 -- Represent process's typed channels
 -- Not to be confused with Dflate's typed channels used in type checking
 data TypedChannel t =
   SendTy (SendPort t)
-  | ReceiveTy (ReceivePort t)
-  
+ | ReceiveTy (ReceivePort t)
+
+
+
 data ThreadCfg =
   Cfg { term :: Term,
         env  :: M.Map String Term,
@@ -82,6 +90,125 @@ data ThreadCfg =
         pid :: ProcessId,
         chanMap :: M.Map Channel (TypedChannel Term)  -- map from Dflate Channel type to Control.Concurrent.Chan
   }
+
+-- Serialized version of ThreadCfg.
+-- Used in TEE
+data SerializeThreadCfg =
+  SerializeCfg { sterm :: Term,
+                 senv  :: M.Map String Term,
+                 splace:: Place,
+                 spid :: ProcessId,  -- current process id
+                 sppid :: ProcessId, -- parent process id
+                 schanMap :: M.Map Channel (SendPort Term)  -- ReceivePort cannot be serialized
+  } deriving (Eq, Show, Typeable, Generic)
+
+instance B.Binary SerializeThreadCfg
+
+  
+-- used in the evaluation by remote process.
+-- Almost similar to eval except that there are no user-defined monads involved.
+remoteeval :: SerializeThreadCfg -> Process SerializeThreadCfg
+remoteeval cfg = case (sterm cfg) of
+  Var x -> let tenv = senv cfg in
+    case (M.lookup x tenv) of
+      Nothing -> do
+        liftIO $ putStrLn   $ "Lookup for variable " ++ x ++ " failed."
+        return cfg {  sterm = Unit,  senv = M.empty,  splace = Prim B,  schanMap = M.empty  }
+      Just t -> return $ cfg { sterm = t }
+  I n -> return cfg
+  Unit -> return cfg
+  Abs x ty pc' theta'  t ->  return cfg
+  Actsfor p q ->  return cfg
+  InjL t ty -> do
+    cfg' <- remoteeval cfg{sterm = t}
+    return cfg{sterm = InjL (sterm cfg') ty }
+  InjR t ty -> do
+    cfg' <- remoteeval cfg{sterm = t}
+    return cfg{sterm = InjR (sterm cfg') ty } 
+  t1 :@ t2 -> return cfg
+  App t1 t2 -> do
+    lamcfg <-remoteeval cfg{sterm = t1}
+    argcfg <-remoteeval cfg{sterm = t2}
+    case (sterm lamcfg) of
+      Abs x ty pc' theta' t -> do
+        let e' = senv lamcfg
+        let v = sterm argcfg
+        return lamcfg{sterm = t, senv = M.insert x v e'}
+  Case t1 x t2 y t3 -> do
+    ccfg <-remoteeval cfg{sterm = t1}
+    let e' = senv cfg
+    case (sterm ccfg) of
+      InjL  v _ ->remoteeval cfg{sterm = t2, senv = M.insert x v e'}
+      InjR  v _ ->remoteeval cfg{sterm = t3, senv = M.insert y v e'}
+  Pair t1 t2 -> do
+    cfg1 <-remoteeval cfg{sterm = t1}
+    cfg2 <-remoteeval cfg{sterm = t2}
+    return cfg{sterm = Pair (sterm cfg1) (sterm cfg2)}
+  Fst t -> do
+    cfg' <-remoteeval cfg{sterm = t}
+    case (sterm cfg') of
+      Pair v1 v2 -> return cfg{sterm =v1}
+      _ -> do
+        liftIO $ putStrLn   $ "Expected a pair value, but received none"
+        return cfg{  sterm = Unit,  senv = M.empty,  splace = Prim B,  schanMap = M.empty  }
+  Snd t -> do
+    cfg' <-remoteeval cfg{sterm = t}
+    case (sterm cfg') of
+      Pair v1 v2 -> return cfg{sterm =v2}
+      _ -> do
+        liftIO $ putStrLn   $ "Expected a pair value, but received none"
+        return cfg{  sterm = Unit,  senv = M.empty,  splace = Prim B,  schanMap = M.empty  } 
+  Bind x t1 t2  -> do
+    cfg1 <-remoteeval cfg{sterm = t1}
+    let e' = senv cfg
+    case (sterm cfg1) of
+      Protect l t -> return cfg{sterm = t2, senv = M.insert x t e'}
+      _ -> do
+        liftIO $ putStrLn   $ "Expected a protected value, received none"
+        return cfg{  sterm = Unit,  senv = M.empty,  splace = Prim B,  schanMap = M.empty  }  
+  Protect l t  -> do
+     cfg' <-remoteeval cfg{sterm = t}
+     return cfg{sterm = Protect l (sterm cfg')}
+  Assume t1 t2 -> do
+    cfg1 <-remoteeval cfg{sterm = t1}
+    let v = sterm cfg1  -- can be acts-for or where term
+    return cfg{sterm = t2 :@ v}
+  Send ch t1 t2 ->
+    let chmap = schanMap cfg in
+    case (M.lookup ch chmap) of
+      Just ch' -> do
+        cfg' <- remoteeval cfg{sterm = t1}
+        -- get the value
+        let v = sterm cfg'
+        -- send the value to the channel
+        sendChan ch' v
+        -- continue with continuation
+        return cfg{sterm = t2}
+      Nothing -> do
+        liftIO $ putStrLn   $ "Channel not found in the environment"
+        return cfg{  sterm = Unit,  senv = M.empty,  splace = Prim B,  schanMap = M.empty  }  
+  _ ->  do
+    liftIO $ putStrLn   $ "unhandled case"
+    return cfg{  sterm = Unit,  senv = M.empty,  splace = Prim B,  schanMap = M.empty  } 
+
+   
+
+
+test :: SerializeThreadCfg -> Process ()
+test cfg =
+  let pid = spid cfg in -- get the thread to respond to
+  do
+    (chs, chr) <- newChan -- typed channels
+    send pid (chs :: (SendPort Term))
+    cfg' <- (remoteeval cfg)
+    liftIO $ putStrLn $ "evaluation complete."
+    --send pid ((sterm cfg') :: Term)
+
+
+remotable ['test]
+
+myRemoteTable :: RemoteTable
+myRemoteTable = Simulator.__remoteTable initRemoteTable
 
 
 spawnProcesswith :: DflateSim a -> DelContext -> Process (a, DelContext)
@@ -99,6 +226,7 @@ eval cfg = case (term cfg) of
       Nothing -> fail $ "Lookup for variable " ++ x ++ " failed."
       Just t -> return $ cfg { term = t }
   I n -> return cfg
+  Unit -> return cfg
   Abs x ty pc' theta'  t -> return cfg
   Actsfor p q -> return cfg
   InjL t ty -> do
@@ -152,14 +280,14 @@ eval cfg = case (term cfg) of
   Spawn p' q chr pcr  tyr chs pcs tys t1 t2 ->
     -- spawn a local process for now
     -- using typed channel
-    -- FIXME: ReceivePort cannot be serialized
+
       do
         del <- getDelContext
         let chmap = chanMap cfg
         (chs', chr') <- liftProcess  newChan  -- send and receive channel (for spawned process)
         spid <- liftProcess $ spawnLocal $ do
           spid <- getSelfPid
-          void $ spawnProcesswith (eval  $ Cfg {term = t1, env = M.empty, place = q,  pid = spid, chanMap = M.fromList [(chr, ReceiveTy chr'), (chs, SendTy chs')]})  del
+          void $ spawnProcesswith (eval  $ Cfg {term = t1, env = M.empty, place = q,  pid = spid, chanMap = M.fromList [(chs, SendTy chs'), (chr, ReceiveTy chr')]})  del
           liftIO $ putStrLn $ "Spawned a computation on node " ++ (show q)
         return cfg{ term = t2, chanMap = M.union (M.fromList [(chr, ReceiveTy chr'), (chs, SendTy chs')]) chmap}
   Send ch t1 t2 -> do
@@ -183,7 +311,7 @@ eval cfg = case (term cfg) of
     -- continue with continuation
     return cfg{term = t, env = M.insert x v e'}
   TEE q t ->
-    -- RPC call
+{-    -- RPC call
     -- similar to spawn for now except that no new channels are created
     -- wait for result
     -- TEE cannot communicate even with the host
@@ -194,6 +322,54 @@ eval cfg = case (term cfg) of
           spid <- getSelfPid
           spawnProcesswith  (eval  $ Cfg {term = t, env = M.empty, place = q,  pid = spid, chanMap = M.empty})  del
         return cfg{ term = RunTEE q Unit} 
-    
+-}
+    do
+      -- start the worker node on the container
+      -- installContainer -- disabled for now
+--      err <- withContainer (Container "my-container" Nothing) $ do
+--        attachRunWait defaultAttachOptions{attachUID = 0} "/home/anitha/tee/worker" ["worker", "worker", "8080"]
+            -- FIXME: ReceivePort cannot be serialized
+           {-
+                 Parent [chr'] <---- [chs'] Child
+                 Parent [chs''] -----> [chr''] Child  
+          -}
+      let lp = "8002"
+      let rp = "8080"
+      let laddr = "10.0.3.1"
+      let raddr = "10.0.3.6"
+      Right transport <- liftIO $ createTransport "10.0.3.1" lp (\port'-> ("10.0.3.1", port') ) defaultTCPParameters
+      let remote = mkAddr raddr rp
+      let them = NodeId $ EndPointAddress (BS8.pack remote)
+      liftIO $ putStrLn "Starting enclave ..."
+      node <- liftIO $ newLocalNode transport myRemoteTable
+      reply <- liftIO $ C.newEmptyMVar
+      ppid <- getPid
+      liftIO $ forkProcess node $ do
+        thispid <- getSelfPid
+        liftIO $ putStrLn "Calling enclave ..."
+        _ <- spawnAsync them $ $(mkClosure 'test) (SerializeCfg{sterm = t, senv = M.empty, splace = q, spid = thispid, sppid = ppid, schanMap = M.empty })
+        -- RPC hangs. Fix later
+--      res <- call  $(functionTDict 'test) them $ $(mkClosure 'test) ( "using call")
+        liftIO $ putStrLn $ "Waiting for reply from enclave ..."
+        res <- expect :: Process Term
+        liftIO $ putStrLn $ "Received reply"
+        liftIO $ C.putMVar reply (show res)
+        liftIO $ print =<< C.takeMVar reply
+      return cfg{ term = RunTEE q Unit }
   _ -> fail  "Case not handled"
-  
+
+mkAddr :: String -> String -> String
+mkAddr ipaddr port = ipaddr ++ ":" ++ port ++ ":0"
+
+installContainer :: IO ()
+installContainer = withContainer (Container "my-container" Nothing) $ do
+  -- expensive process;
+  status <- create "download" Nothing Nothing [] ["-d", "ubuntu", "-r", "bionic", "-a", "amd64"]
+  start False []
+  let attachopt = defaultAttachOptions{attachUID = 0}
+  attachRunWait  attachopt "apt-get" ["apt-get", "install", "ghc"]
+  attachRunWait  attachopt "apt-get" ["apt-get", "install", "cabal-install"]
+  attachRunWait  attachopt "cabal" ["cabal", "update"]
+  attachRunWait  attachopt "cabal" ["sudo cabal", "install", "distributed-process", "network-transport-tcp"]
+  attachRunWait  attachopt "/home/anitha/tee/worker" ["worker", "worker", "8080"]
+  void $ stop
