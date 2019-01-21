@@ -2,9 +2,16 @@ Implementation of Distributed FLAC using naive proof search.
 
 ## Prerequisites
 
+### Build Platform
 
-* Cloud Haskell : distributed-process, network-transpor-tcp, bindings-lxc
-* Ubuntu
+* Ubuntu 18
+* LXC
+
+### Haskell Dependencies
+
+* Cloud Haskell : distributed-process, network-transpor-tcp
+* bindings-lxc
+
 
 
 ## Issues
