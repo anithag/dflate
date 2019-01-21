@@ -333,7 +333,7 @@ eval cfg = case (term cfg) of
                  Parent [chr'] <---- [chs'] Child
                  Parent [chs''] -----> [chr''] Child  
           -}
-      let lp = "8002"
+      let lp = "8081"
       let rp = "8080"
       let laddr = "10.0.3.1"
       let raddr = "10.0.3.6"
@@ -347,11 +347,11 @@ eval cfg = case (term cfg) of
       liftIO $ forkProcess node $ do
         thispid <- getSelfPid
         liftIO $ putStrLn "Calling enclave ..."
-        _ <- spawnAsync them $ $(mkClosure 'test) (SerializeCfg{sterm = t, senv = M.empty, splace = q, spid = thispid, sppid = ppid, schanMap = M.empty })
+--        _ <- spawn them $ $(mkClosure 'test) (SerializeCfg{sterm = t, senv = M.empty, splace = q, spid = thispid, sppid = ppid, schanMap = M.empty })
         -- RPC hangs. Fix later
---      res <- call  $(functionTDict 'test) them $ $(mkClosure 'test) ( "using call")
+        res <- call  $(functionTDict 'test) them $ $(mkClosure 'test)  (SerializeCfg{sterm = t, senv = M.empty, splace = q, spid = thispid, sppid = ppid, schanMap = M.empty })
         liftIO $ putStrLn $ "Waiting for reply from enclave ..."
-        res <- expect :: Process Term
+        res <- expect :: Process (SendPort Term)
         liftIO $ putStrLn $ "Received reply"
         liftIO $ C.putMVar reply (show res)
         liftIO $ print =<< C.takeMVar reply

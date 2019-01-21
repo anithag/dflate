@@ -22,6 +22,12 @@ Dependencies have been frozen to ensure compatibility during serialization. Refe
 * cabal build
 * cabal install
 
+### How to Run
+
+On manager node: sudo cabal run dflate
+On worker node : DISTRIBUTED_PROCESS_TRACE_CONSOLE=1 DISTRIBUTED_PROCESS_TRACE_FLAGS=pdusrl cabal run worker 8080
+
+
 ## Issues
 
 1. TEE is implemented as a light-weight linux container. At the moment the container creation is hard-coded for testing.
