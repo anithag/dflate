@@ -63,5 +63,12 @@ communication.
 ## Design Notes for TEE's
 
 
-A TEE is implemented as a light-weight linux container. Following steps are used to create container:
+A TEE is implemented as a light-weight linux container.
+
+## Future Extensions
+
+1. Using actual Intel SGX SDK
+2. Using AMD SEV (Secure encrypted virtualization)
+   https://github.com/AMDESE/AMDSEV
+   
 
