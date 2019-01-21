@@ -14,11 +14,11 @@ Implementation of Distributed FLAC using naive proof search.
 
 ### How to Build
 
-Dependencies have been frozen to ensure compatibility during serialization.
+Dependencies have been frozen to ensure compatibility during serialization. Refer to cabal.config for dependency constraints.
 
 * cabal sandbox init
-* cabal configure
 * cabal install --dependencies-only
+* cabal configure
 * cabal build
 * cabal install
 
