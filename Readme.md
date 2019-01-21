@@ -12,7 +12,15 @@ Implementation of Distributed FLAC using naive proof search.
 * Cloud Haskell : distributed-process, network-transpor-tcp
 * bindings-lxc
 
+### How to Build
 
+Dependencies have been frozen to ensure compatibility during serialization.
+
+* cabal sandbox init
+* cabal configure
+* cabal install --dependencies-only
+* cabal build
+* cabal install
 
 ## Issues
 

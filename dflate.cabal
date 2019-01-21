@@ -19,7 +19,7 @@ executable dflate
   main-is:             Main.hs
   -- other-modules:
   -- other-extensions:
-  build-depends:       base >=4.11 && <4.12,
+  build-depends:       base,
                        containers, distributed-process,
                        network-transport, binary,
                        network-transport-tcp, bytestring,
