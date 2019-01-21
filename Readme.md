@@ -24,8 +24,8 @@ Dependencies have been frozen to ensure compatibility during serialization. Refe
 
 ### How to Run
 
-On manager node: sudo cabal run dflate
-On worker node : DISTRIBUTED_PROCESS_TRACE_CONSOLE=1 DISTRIBUTED_PROCESS_TRACE_FLAGS=pdusrl cabal run worker 8080
+- On manager node: sudo cabal run dflate
+- On worker node : DISTRIBUTED_PROCESS_TRACE_CONSOLE=1 DISTRIBUTED_PROCESS_TRACE_FLAGS=pdusrl cabal run worker 8080
 
 
 ## Issues
@@ -33,7 +33,7 @@ On worker node : DISTRIBUTED_PROCESS_TRACE_CONSOLE=1 DISTRIBUTED_PROCESS_TRACE_F
 1. TEE is implemented as a light-weight linux container. At the moment the container creation is hard-coded for testing.
 2. Typed channels are used. However, _ReceivePort_ can not be serialized. So a TEE process has to create a _ReceivePort_ and send it to parent process for
 communication.
-3. There are issues with sending and receiving ports using _send_ and _expect_
+
 
 ## TODO
 
