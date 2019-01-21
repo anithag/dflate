@@ -23,8 +23,8 @@ import Data.List as L
 -- Used in TEE                                                                                                                                                                                                                                
 data SerializeThreadCfg =
   SerializeCfg { sterm :: Term,
-                 senv  :: M.Map String Term,
-                 splace:: Place,
+			 senv  :: M.Map String Term,
+			 splace:: Place,
                  spid :: ProcessId,  -- current process id                                                                                                                                                                                    
                  sppid :: ProcessId, -- parent process id                                                                                                                                                                                     
                  schanMap :: M.Map Channel (SendPort Term)  -- ReceivePort cannot be serialized                                                                                                                                               
@@ -122,10 +122,10 @@ test cfg =
   let pid = spid cfg in -- get the thread to respond to                                                                                                                                                                                       
   do
     (chs, chr) <- newChan :: Process (SendPort Term, ReceivePort Term) -- typed channels 
-    --send pid (wrapMessage chs)
+    send pid (chs::(SendPort Term))
     cfg' <- (remoteeval cfg)
     liftIO $ putStrLn $ "evaluation complete."
-    send pid ((sterm cfg') :: Term)
+    --send pid ((sterm cfg') :: Term)
 
 remotable['test]
 

@@ -24,7 +24,7 @@ main = do
   case tp of
     "worker" -> case rest of
       [port] -> do
-        putStrLn $ "starting worker on " ++ port
+        putStrLn $ "starting worker on " ++ "10.0.3.6:" ++ port
         t <- createTransport "10.0.3.6" port (\port'-> ("10.0.3.6", port') ) defaultTCPParameters
         case t of 
           Right transport -> do
