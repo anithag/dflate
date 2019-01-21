@@ -24,8 +24,8 @@ Dependencies have been frozen to ensure compatibility during serialization. Refe
 
 ### How to Run
 
-- On manager node: sudo cabal run dflate
-- On worker node : DISTRIBUTED_PROCESS_TRACE_CONSOLE=1 DISTRIBUTED_PROCESS_TRACE_FLAGS=pdusrl cabal run worker 8080
+- *On manager node:* sudo cabal run dflate
+- *On worker node :* DISTRIBUTED_PROCESS_TRACE_CONSOLE=1 DISTRIBUTED_PROCESS_TRACE_FLAGS=pdusrl cabal run worker 8080
 
 
 ## Issues
