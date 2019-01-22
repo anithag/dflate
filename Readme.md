@@ -27,7 +27,7 @@ Dependencies have been frozen to ensure compatibility during serialization. Refe
 
 1. lxc-create -t download -n _tee\_name_
 2. lxc-start -n _tee\_name_
-3. lxc-attach -n _tee\_name>_
+3. lxc-attach -n _tee\_name_
    1. (Inside bash shell) apt-get install haskell-platform
    2. git clone https://github.com/anithag/dflate.git
    3. cd dflate
@@ -45,9 +45,9 @@ Dependencies have been frozen to ensure compatibility during serialization. Refe
 ## Issues
 
 1. TEE is implemented as a light-weight linux container. At the moment the IP addresses used for spawning remote processes are hard-coded.
-    * (** on dflate node **) ip addr show lxcbr0
+    * (**on dflate node**) ip addr show lxcbr0
       > inet 10.0.3.1/24 scope global lxcbr0
-    * (** on TEE node **) ip addr show eth0
+    * (**on TEE node**) ip addr show eth0
       > inet 10.0.3.6/24 brd 10.0.3.255
           
 2. Typed channels are used. However, _ReceivePort_ can not be serialized. So a TEE process has to create a _ReceivePort_ and send it to parent process for
