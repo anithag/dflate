@@ -40,20 +40,5 @@ main = do
     runProcess node $ do
       spid <- getSelfPid
       void $ spawnProcesswith (eval  $ Cfg {term = inp, env = M.empty, place = Prim (N local), pid = spid, chanMap = M.empty})  S.empty
-{-
-    reply <- C.newEmptyMVar
-    spid <- forkProcess node $ do
-      me <- getSelfPid
-      say (show me)
-      -- spawn hangs but spawnAsync proceeds fine                                                                                                                                                                                         
-      _pid <- spawn them  $ $(mkClosure 'test) ( "using spawn", me)
-      --    _ <- spawnAsync them $ $(mkClosure 'test) ( "using spawn", me)
-      say "Waiting for reply from spawned process ..."
-      i <- expect :: (Process Int)
-      liftIO $ putStrLn $ "Received reply" ++ (show i)
-      liftIO $ C.putMVar reply i
-    liftIO $ putStrLn $ " Forked process that spawns remotely :" ++ (show spid)
-    print =<< C.takeMVar reply
--}
   where
     mkAddr ipaddr port = ipaddr ++ ":" ++ port ++ ":0"
