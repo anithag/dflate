@@ -345,7 +345,7 @@ eval cfg = case (term cfg) of
       reply <- liftIO $ C.newEmptyMVar
       ppid <- getPid
       (chs, chr) <- liftProcess $ newChan -- typed channels
-      _ <- liftIO $ runProcess node $ do
+      tmpid <- liftIO $ forkProcess node $ do
         thispid <- getSelfPid
         liftIO $ putStrLn "Calling enclave ..."
 --        _ <- spawn them $ $(mkClosure 'test) (SerializeCfg{sterm = t, senv = M.empty, splace = q, spid = thispid, sppid = ppid, schanMap = M.empty })
@@ -354,14 +354,15 @@ eval cfg = case (term cfg) of
         liftIO $ putStrLn $ "Waiting for reply from enclave ..."
         sendport <- expect :: Process (SendPort Term)
         send ppid sendport -- send to host process
-        liftIO $ putStrLn $ "Received reply"
+        liftIO $ print  "RPC reply : "
         liftIO $ C.putMVar reply (show res)
         liftIO $ print =<< C.takeMVar reply
       -- monitor the forked process?
-      -- mref <- liftProcess $ monitor spid
+      mref <- liftProcess $ monitor tmpid
       sendport <- liftProcess $ do
         sendport <- expect :: Process (SendPort Term)
         return sendport
+      liftIO $ putStrLn $ "Received enclave's send port " ++ (show sendport)
       return cfg{ term = RunTEE q Unit, chanMap = M.union (M.fromList [(qr, ReceiveTy chr), (qs, SendTy sendport)]) chmap  }
   _ -> fail  "Case not handled"
 
